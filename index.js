@@ -1,5 +1,5 @@
 const mineflayer = require('mineflayer');
-const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
+
 const { GoalFollow, GoalBlock } = goals;
 const Vec3 = require('vec3');
 
