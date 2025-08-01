@@ -1,5 +1,7 @@
 const mineflayer = require('mineflayer');
-const autoFish = require('mineflayer-auto-fish');
+const { pathfinder, Movements, goals } = require('mineflayer-pathfinder');
+const { GoalFollow, GoalBlock } = goals;
+const Vec3 = require('vec3');
 
 const bot = mineflayer.createBot({
   host: 'SlxshyNationCraft.aternos.me',
@@ -8,22 +10,29 @@ const bot = mineflayer.createBot({
   version: '1.21.1'
 });
 
-bot.loadPlugin(autoFish);
+bot.loadPlugin(pathfinder);
 
-// Store whether auto-fish is active
-let fishing = false;
+let defaultMove;
+let following = false;
 
-// Available commands
+// Command list
 const commands = {
   help: "Shows all commands",
-  fish: "Toggle auto-fishing on/off",
-  sleep: "Manually try to sleep",
+  coords: "Shows bot's coordinates",
+  come: "Bot follows you",
+  stop: "Stops following/movement",
+  dance: "Bot jumps repeatedly for fun",
+  sleep: "Tries to sleep in a nearby bed"
 };
 
-bot.on('spawn', () => {
+bot.once('spawn', () => {
   console.log('✅ Bot connected.');
 
-  // Keep jumping every 15 seconds (AFK prevention)
+  // Set up movement settings for pathfinder
+  defaultMove = new Movements(bot, bot.registry);
+  bot.pathfinder.setMovements(defaultMove);
+
+  // Keep jumping every 15s to prevent AFK kick
   setInterval(() => {
     bot.setControlState('jump', true);
     setTimeout(() => bot.setControlState('jump', false), 500);
@@ -32,7 +41,7 @@ bot.on('spawn', () => {
 
 // Chat command handler
 bot.on('chat', (username, message) => {
-  if (username === bot.username) return; // Ignore itself
+  if (username === bot.username) return;
 
   const args = message.trim().split(' ');
   const cmd = args[0].toLowerCase();
@@ -44,15 +53,42 @@ bot.on('chat', (username, message) => {
     }
   }
 
-  if (cmd === 'fish') {
-    fishing = !fishing;
-    if (fishing) {
-      bot.chat("🎣 Auto-fishing started.");
-      bot.autoFish.start();
-    } else {
-      bot.chat("🛑 Auto-fishing stopped.");
-      bot.autoFish.stop();
+  if (cmd === 'coords') {
+    const pos = bot.entity.position;
+    bot.chat(`📍 My coords: X:${pos.x.toFixed(1)} Y:${pos.y.toFixed(1)} Z:${pos.z.toFixed(1)}`);
+  }
+
+  if (cmd === 'come') {
+    const player = bot.players[username]?.entity;
+    if (!player) {
+      bot.chat("❌ I can't see you!");
+      return;
     }
+    bot.chat(`🚶 Following ${username}`);
+    bot.pathfinder.setGoal(new GoalFollow(player, 1), true);
+    following = true;
+  }
+
+  if (cmd === 'stop') {
+    bot.chat("🛑 Stopping movement");
+    bot.pathfinder.stop();
+    following = false;
+  }
+
+  if (cmd === 'dance') {
+    bot.chat("💃 Dancing!");
+    let jumps = 0;
+    const danceInterval = setInterval(() => {
+      if (jumps >= 10) {
+        clearInterval(danceInterval);
+        bot.setControlState('jump', false);
+        bot.chat("🛑 Dance finished");
+      } else {
+        bot.setControlState('jump', true);
+        setTimeout(() => bot.setControlState('jump', false), 300);
+        jumps++;
+      }
+    }, 600);
   }
 
   if (cmd === 'sleep') {
@@ -60,7 +96,7 @@ bot.on('chat', (username, message) => {
   }
 });
 
-// Auto sleep at night
+// Auto-sleep at night
 bot.on('time', () => {
   const time = bot.time.timeOfDay;
   const isNight = time > 12541 && time < 23458;
@@ -71,7 +107,7 @@ bot.on('time', () => {
 
 function trySleep() {
   const bed = bot.findBlock({
-    matching: bot.registry.blocksByName.white_bed.id
+    matching: block => block.name.endsWith('_bed')
   });
   if (!bed) {
     bot.chat("🛏 No bed nearby!");
