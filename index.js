@@ -1,6 +1,4 @@
 const mineflayer = require('mineflayer');
-
-const { GoalFollow, GoalBlock } = goals;
 const Vec3 = require('vec3');
 
 const bot = mineflayer.createBot({
@@ -10,27 +8,16 @@ const bot = mineflayer.createBot({
   version: '1.21.1'
 });
 
-bot.loadPlugin(pathfinder);
-
-let defaultMove;
-let following = false;
-
 // Command list
 const commands = {
   help: "Shows all commands",
   coords: "Shows bot's coordinates",
-  come: "Bot follows you",
-  stop: "Stops following/movement",
   dance: "Bot jumps repeatedly for fun",
   sleep: "Tries to sleep in a nearby bed"
 };
 
 bot.once('spawn', () => {
   console.log('✅ Bot connected.');
-
-  // Set up movement settings for pathfinder
-  defaultMove = new Movements(bot, bot.registry);
-  bot.pathfinder.setMovements(defaultMove);
 
   // Keep jumping every 15s to prevent AFK kick
   setInterval(() => {
@@ -56,23 +43,6 @@ bot.on('chat', (username, message) => {
   if (cmd === 'coords') {
     const pos = bot.entity.position;
     bot.chat(`📍 My coords: X:${pos.x.toFixed(1)} Y:${pos.y.toFixed(1)} Z:${pos.z.toFixed(1)}`);
-  }
-
-  if (cmd === 'come') {
-    const player = bot.players[username]?.entity;
-    if (!player) {
-      bot.chat("❌ I can't see you!");
-      return;
-    }
-    bot.chat(`🚶 Following ${username}`);
-    bot.pathfinder.setGoal(new GoalFollow(player, 1), true);
-    following = true;
-  }
-
-  if (cmd === 'stop') {
-    bot.chat("🛑 Stopping movement");
-    bot.pathfinder.stop();
-    following = false;
   }
 
   if (cmd === 'dance') {
