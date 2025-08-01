@@ -26,7 +26,7 @@ bot.on('spawn', () => {
 
   // Send chat message every 60 seconds
   setInterval(() => {
-    bot.chat('Still online... 🌐');
+    bot.chat('');
   }, 60000);
 
   // Jump every 15 seconds to stay active
