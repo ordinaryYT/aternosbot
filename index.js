@@ -1,6 +1,17 @@
 const mineflayer = require('mineflayer');
 const Vec3 = require('vec3');
+const express = require('express');
 
+// === Express Web Server (for Render ping) ===
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.get('/', (req, res) => res.send('✅ Minecraft Bot is running on Render.'));
+app.listen(PORT, () => {
+  console.log(`🌐 Web server is listening on port ${PORT}`);
+});
+
+// === Minecraft Bot Configuration ===
 let bot;
 let isDancing = false;
 
@@ -24,7 +35,6 @@ function startBot() {
   bot.once('spawn', () => {
     console.log('✅ Bot connected.');
 
-    // Jump every 15s unless sleeping or dancing
     setInterval(() => {
       if (!bot.isSleeping && !isDancing) {
         try {
@@ -109,23 +119,20 @@ function startBot() {
     });
   }
 
-  // RECONNECT ONLY AFTER KICK (5 MIN)
   bot.on('kicked', (reason) => {
     console.log('👢 Bot was kicked:', reason);
     console.log("⏳ Reconnecting in 5 minutes...");
     setTimeout(() => {
       console.log("🔁 Reconnecting after kick...");
       startBot();
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 5 * 60 * 1000);
   });
 
-  // IMMEDIATE RECONNECT ON DISCONNECT
   bot.on('end', () => {
     console.log("⚠️ Bot disconnected (end). Reconnecting immediately...");
     startBot();
   });
 
-  // ERROR LOGGING ONLY
   bot.on('error', (err) => {
     console.error('❌ Bot error:', err);
   });
