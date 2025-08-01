@@ -16,13 +16,17 @@ const commands = {
   sleep: "Tries to sleep in a nearby bed"
 };
 
+let isDancing = false;
+
 bot.once('spawn', () => {
   console.log('✅ Bot connected.');
 
-  // Keep jumping every 15s to prevent AFK kick
+  // Keep jumping every 15s to prevent AFK kick (skip if sleeping or dancing)
   setInterval(() => {
-    bot.setControlState('jump', true);
-    setTimeout(() => bot.setControlState('jump', false), 500);
+    if (!bot.isSleeping && !isDancing) {
+      bot.setControlState('jump', true);
+      setTimeout(() => bot.setControlState('jump', false), 500);
+    }
   }, 15000);
 });
 
@@ -46,13 +50,20 @@ bot.on('chat', (username, message) => {
   }
 
   if (cmd === 'dance') {
+    if (bot.isSleeping) {
+      bot.chat("😴 I can't dance while sleeping!");
+      return;
+    }
+
     bot.chat("💃 Dancing!");
+    isDancing = true;
     let jumps = 0;
     const danceInterval = setInterval(() => {
-      if (jumps >= 10) {
+      if (jumps >= 10 || bot.isSleeping) {
         clearInterval(danceInterval);
         bot.setControlState('jump', false);
         bot.chat("🛑 Dance finished");
+        isDancing = false;
       } else {
         bot.setControlState('jump', true);
         setTimeout(() => bot.setControlState('jump', false), 300);
