@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "mineflayer": "^4.11.1",
-    "mineflayer-auto-fish": "^2.1.0"
+    
   }
 }
