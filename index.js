@@ -1,0 +1,26 @@
+const mineflayer = require('mineflayer');
+
+const bot = mineflayer.createBot({
+  host: 'yourserver.aternos.me', // 🔁 Replace with your Aternos IP
+  port: 25565,
+  username: 'AFK_Bot123',        // 🔁 Choose any username
+  version: false
+});
+
+bot.on('spawn', () => {
+  console.log('✅ Bot connected.');
+
+  setInterval(() => {
+    bot.setControlState('jump', true);
+    setTimeout(() => bot.setControlState('jump', false), 500);
+  }, 15000);
+});
+
+bot.on('end', () => {
+  console.log('🔁 Disconnected. Restarting...');
+  process.exit(1); // Let Render restart it
+});
+
+bot.on('error', (err) => {
+  console.error('❌ Bot error:', err);
+});
