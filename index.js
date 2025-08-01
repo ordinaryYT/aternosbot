@@ -21,11 +21,15 @@ let isDancing = false;
 bot.once('spawn', () => {
   console.log('✅ Bot connected.');
 
-  // Keep jumping every 15s to prevent AFK kick (skip if sleeping or dancing)
+  // Keep jumping every 15s to prevent AFK kick (but not while sleeping or dancing)
   setInterval(() => {
     if (!bot.isSleeping && !isDancing) {
-      bot.setControlState('jump', true);
-      setTimeout(() => bot.setControlState('jump', false), 500);
+      try {
+        bot.setControlState('jump', true);
+        setTimeout(() => bot.setControlState('jump', false), 500);
+      } catch (err) {
+        console.error('❌ Jump error:', err);
+      }
     }
   }, 15000);
 });
@@ -77,7 +81,7 @@ bot.on('chat', (username, message) => {
   }
 });
 
-// Auto-sleep at night
+// Auto-sleep at night (no manual wake-up)
 bot.on('time', () => {
   const time = bot.time.timeOfDay;
   const isNight = time > 12541 && time < 23458;
@@ -90,22 +94,38 @@ function trySleep() {
   const bed = bot.findBlock({
     matching: block => block.name.endsWith('_bed')
   });
+
   if (!bed) {
     bot.chat("🛏 No bed nearby!");
     return;
   }
+
   bot.sleep(bed).then(() => {
     bot.chat("💤 Sleeping...");
   }).catch(err => {
+    console.error('❌ Failed to sleep:', err);
     bot.chat("❌ Can't sleep: " + err.message);
   });
 }
 
+// Log disconnects but don't force exit immediately
 bot.on('end', () => {
-  console.log('🔁 Disconnected. Restarting...');
-  process.exit(1);
+  console.log('⚠️ Bot disconnected (end event).');
 });
 
 bot.on('error', (err) => {
   console.error('❌ Bot error:', err);
+});
+
+bot.on('kicked', (reason) => {
+  console.log('👢 Bot was kicked:', reason);
+});
+
+// Catch silent crashes
+process.on('unhandledRejection', (reason) => {
+  console.error('🛑 Unhandled Promise Rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('🔥 Uncaught Exception:', err);
 });
