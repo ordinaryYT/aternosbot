@@ -28,7 +28,7 @@ const commands = {
   rickroll: "Plays Never Gonna Give You Up with note blocks"
 };
 
-// === Bot Start ===
+// === Start Bot ===
 function startBot() {
   bot = mineflayer.createBot(config);
   const versionData = mcData(bot.version);
@@ -85,13 +85,13 @@ function startBot() {
     }
   });
 
-  // === Move Bot to Target X,Z Position ===
-  async function moveTo(targetPos) {
+  // === Move Bot Forward ===
+  async function walkForward(distance) {
     return new Promise((resolve) => {
+      const targetZ = bot.entity.position.z + distance;
       bot.setControlState('forward', true);
       const check = setInterval(() => {
-        const dist = bot.entity.position.distanceTo(targetPos);
-        if (dist < 2) {
+        if (Math.abs(bot.entity.position.z - targetZ) < 0.5) {
           bot.setControlState('forward', false);
           clearInterval(check);
           resolve();
@@ -123,26 +123,31 @@ function startBot() {
       return;
     }
 
-    let placeBase = bot.entity.position.floored().offset(1, 0, 0);
+    // Face forward for consistent placement
+    bot.look(0, 0, true);
 
     for (let i = 0; i < song.length; i++) {
-      // Move close enough to place
-      await moveTo(placeBase);
+      // Move forward for each note
+      if (i > 0) await walkForward(1);
 
-      const blockBelow = bot.blockAt(placeBase.offset(0, -1, 0));
+      // Position to the right
+      const placePos = bot.entity.position.floored().offset(1, 0, 0);
+      const blockBelow = bot.blockAt(placePos.offset(0, -1, 0));
       if (!blockBelow || blockBelow.name === 'air') {
-        bot.chat(`❌ No block under note at index ${i}`);
+        bot.chat(`❌ No solid block under note ${i + 1}`);
         return;
       }
 
+      // Place note block
       await bot.equip(noteBlockItem, 'hand');
       try {
         await bot.placeBlock(blockBelow, new Vec3(0, 1, 0));
       } catch (err) {
-        console.error(`❌ Failed placing at ${placeBase}:`, err);
+        console.error(`❌ Failed placing at ${placePos}:`, err);
       }
 
-      const placedBlock = bot.blockAt(placeBase);
+      // Tune block
+      const placedBlock = bot.blockAt(placePos);
       if (placedBlock && placedBlock.name === 'note_block') {
         for (let t = 0; t < song[i].pitch; t++) {
           await bot.activateBlock(placedBlock);
@@ -151,13 +156,8 @@ function startBot() {
       }
 
       // Play it
-      if (placedBlock) {
-        await bot.activateBlock(placedBlock);
-      }
+      if (placedBlock) await bot.activateBlock(placedBlock);
       await bot.waitForTicks(song[i].delay);
-
-      // Next position
-      placeBase = placeBase.offset(1, 0, 0);
     }
 
     bot.chat("✅ Rickroll complete!");
