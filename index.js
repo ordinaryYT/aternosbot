@@ -37,7 +37,6 @@ function startBot() {
     console.log('✅ Bot connected.');
   });
 
-  // === Chat Commands ===
   bot.on('chat', async (username, message) => {
     if (username === bot.username) return;
     const args = message.trim().split(' ');
@@ -85,18 +84,18 @@ function startBot() {
     }
   });
 
-  // === Move Bot Forward ===
-  async function walkForward(distance) {
+  // === Move Bot Precisely ===
+  async function moveToBlockCenter(target) {
     return new Promise((resolve) => {
-      const targetZ = bot.entity.position.z + distance;
       bot.setControlState('forward', true);
       const check = setInterval(() => {
-        if (Math.abs(bot.entity.position.z - targetZ) < 0.5) {
+        const dist = bot.entity.position.distanceTo(target);
+        if (dist < 0.3) {
           bot.setControlState('forward', false);
           clearInterval(check);
           resolve();
         }
-      }, 100);
+      }, 50);
     });
   }
 
@@ -123,22 +122,26 @@ function startBot() {
       return;
     }
 
-    // Face forward for consistent placement
     bot.look(0, 0, true);
 
-    for (let i = 0; i < song.length; i++) {
-      // Move forward for each note
-      if (i > 0) await walkForward(1);
+    let startPos = bot.entity.position.floored();
 
-      // Position to the right
-      const placePos = bot.entity.position.floored().offset(1, 0, 0);
+    for (let i = 0; i < song.length; i++) {
+      if (i > 0) {
+        // Move forward exactly 1 block
+        const nextPos = startPos.offset(0, 0, 1);
+        await moveToBlockCenter(nextPos);
+        startPos = nextPos;
+      }
+
+      // Place note block to the right and ahead
+      const placePos = startPos.offset(1, 0, 1);
       const blockBelow = bot.blockAt(placePos.offset(0, -1, 0));
       if (!blockBelow || blockBelow.name === 'air') {
-        bot.chat(`❌ No solid block under note ${i + 1}`);
+        bot.chat(`❌ No block under note ${i + 1}`);
         return;
       }
 
-      // Place note block
       await bot.equip(noteBlockItem, 'hand');
       try {
         await bot.placeBlock(blockBelow, new Vec3(0, 1, 0));
@@ -146,7 +149,6 @@ function startBot() {
         console.error(`❌ Failed placing at ${placePos}:`, err);
       }
 
-      // Tune block
       const placedBlock = bot.blockAt(placePos);
       if (placedBlock && placedBlock.name === 'note_block') {
         for (let t = 0; t < song[i].pitch; t++) {
@@ -155,7 +157,7 @@ function startBot() {
         }
       }
 
-      // Play it
+      // Play the note
       if (placedBlock) await bot.activateBlock(placedBlock);
       await bot.waitForTicks(song[i].delay);
     }
