@@ -26,7 +26,8 @@ const commands = {
   help: "Shows all commands",
   coords: "Shows my coordinates",
   dance: "Bot dances",
-  sleep: "sleeps"
+  sleep: "Sleeps",
+  spawn: "Teleport you to spawn"
 };
 
 function startBot() {
@@ -35,6 +36,7 @@ function startBot() {
   bot.once('spawn', () => {
     console.log('✅ Bot connected.');
 
+    // Jump every 15 seconds when idle
     setInterval(() => {
       if (!bot.isSleeping && !isDancing) {
         try {
@@ -53,6 +55,7 @@ function startBot() {
     const args = message.trim().split(' ');
     const cmd = args[0].toLowerCase();
 
+    // === Help Command ===
     if (cmd === 'help') {
       bot.chat("Available commands:");
       for (const c in commands) {
@@ -60,11 +63,13 @@ function startBot() {
       }
     }
 
+    // === Coords Command ===
     if (cmd === 'coords') {
       const pos = bot.entity.position;
       bot.chat(`📍 My coords: X:${pos.x.toFixed(1)} Y:${pos.y.toFixed(1)} Z:${pos.z.toFixed(1)}`);
     }
 
+    // === Dance Command ===
     if (cmd === 'dance') {
       if (bot.isSleeping) {
         bot.chat("😴 I can't dance while sleeping!");
@@ -88,11 +93,20 @@ function startBot() {
       }, 600);
     }
 
+    // === Sleep Command ===
     if (cmd === 'sleep') {
       trySleep();
     }
+
+    // === Teleport to Spawn Command ===
+    if (message.toLowerCase() === 'diamond teleport me to spawn') {
+      const spawnCoords = { x: 100, y: 64, z: -50 }; // Change to your spawn coords
+      bot.chat(`/tp ${username} ${spawnCoords.x} ${spawnCoords.y} ${spawnCoords.z}`);
+      bot.chat(`✅ Teleported ${username} to spawn!`);
+    }
   });
 
+  // Auto sleep at night
   bot.on('time', () => {
     const time = bot.time.timeOfDay;
     const isNight = time > 12541 && time < 23458;
@@ -119,11 +133,9 @@ function startBot() {
     });
   }
 
-  // REMOVED bot.on('kicked') block
-
   bot.on('end', () => {
     console.log("⚠️ Bot disconnected (end). Reconnecting immediately...");
-    startBot(); // ⚠️ This reconnects instantly
+    startBot(); // reconnect instantly
   });
 
   bot.on('error', (err) => {
