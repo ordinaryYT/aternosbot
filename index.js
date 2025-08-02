@@ -100,7 +100,7 @@ function startBot() {
 
     // === Teleport to Spawn Command ===
     if (message.toLowerCase() === 'diamond teleport me to spawn') {
-      const spawnCoords = { x: 100, y: 64, z: -50 }; // Change to your spawn coords
+      const spawnCoords = { x: 24278, y: 71, z: 25154 }; // Change to your spawn coords
       bot.chat(`/tp ${username} ${spawnCoords.x} ${spawnCoords.y} ${spawnCoords.z}`);
       bot.chat(`✅ Teleported ${username} to spawn!`);
     }
