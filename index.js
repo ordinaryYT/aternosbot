@@ -57,19 +57,19 @@ function startBot() {
     const args = message.trim().split(' ');
     const cmd = args[0].toLowerCase();
 
-    if (cmd === 'help') {
+    if (cmd === 'help' || cmd === '!help') {
       bot.chat("Available commands:");
       for (const c in commands) {
         bot.chat(`- ${c}: ${commands[c]}`);
       }
     }
 
-    if (cmd === 'coords') {
+    if (cmd === 'coords' || cmd === '!coords') {
       const pos = bot.entity.position;
       bot.chat(`📍 My coords: X:${pos.x.toFixed(1)} Y:${pos.y.toFixed(1)} Z:${pos.z.toFixed(1)}`);
     }
 
-    if (cmd === 'dance') {
+    if (cmd === 'dance' || cmd === '!dance') {
       if (bot.isSleeping) {
         bot.chat("😴 I can't dance while sleeping!");
         return;
@@ -91,32 +91,37 @@ function startBot() {
       }, 600);
     }
 
-    if (cmd === 'sleep') {
+    if (cmd === 'sleep' || cmd === '!sleep') {
       trySleep();
     }
 
-    if (cmd === 'rickroll') {
-      bot.chat("🎵 Get ready to never give you up!");
-      await playRickroll();
+    if (cmd === 'rickroll' || cmd === '!rickroll') {
+      bot.chat("🎵 Starting Rickroll...");
+      try {
+        await playRickroll();
+      } catch (err) {
+        console.error("❌ Rickroll failed:", err);
+        bot.chat("❌ Failed to play Rickroll: " + err.message);
+      }
     }
   });
 
   // === Rickroll Function ===
   async function playRickroll() {
-    // Simple melody (recognizable intro phrase)
+    // Simple recognizable intro phrase
     const song = [
-      { pitch: 7, delay: 4 },  // G
-      { pitch: 7, delay: 4 },  // G
-      { pitch: 9, delay: 4 },  // A
-      { pitch: 7, delay: 4 },  // G
-      { pitch: 4, delay: 4 },  // E
-      { pitch: 2, delay: 8 },  // D
       { pitch: 7, delay: 4 },
       { pitch: 7, delay: 4 },
       { pitch: 9, delay: 4 },
       { pitch: 7, delay: 4 },
-      { pitch: 5, delay: 4 },  // F
-      { pitch: 4, delay: 8 }   // E
+      { pitch: 4, delay: 4 },
+      { pitch: 2, delay: 8 },
+      { pitch: 7, delay: 4 },
+      { pitch: 7, delay: 4 },
+      { pitch: 9, delay: 4 },
+      { pitch: 7, delay: 4 },
+      { pitch: 5, delay: 4 },
+      { pitch: 4, delay: 8 }
     ];
 
     const startPos = bot.entity.position.offset(1, 0, 0);
@@ -126,28 +131,39 @@ function startBot() {
       return;
     }
 
-    // Place fixed set of blocks (1 per unique pitch in sequence length)
+    // Place blocks
     for (let i = 0; i < song.length; i++) {
       const placePos = startPos.offset(i, 0, 0);
       const blockBelow = bot.blockAt(placePos.offset(0, -1, 0));
 
+      if (!blockBelow || blockBelow.name === 'air') {
+        bot.chat(`❌ Cannot place note block at ${placePos} - no block below!`);
+        continue;
+      }
+
       await bot.equip(noteBlockItem, 'hand');
-      await bot.placeBlock(blockBelow, new Vec3(0, 1, 0));
+      try {
+        await bot.placeBlock(blockBelow, new Vec3(0, 1, 0));
+      } catch (err) {
+        console.error(`❌ Failed to place block at ${placePos}:`, err);
+      }
 
       const placedBlock = bot.blockAt(placePos);
-
-      // Tune block
-      for (let t = 0; t < song[i].pitch; t++) {
-        await bot.activateBlock(placedBlock);
-        await bot.waitForTicks(2);
+      if (placedBlock && placedBlock.name === 'note_block') {
+        for (let t = 0; t < song[i].pitch; t++) {
+          await bot.activateBlock(placedBlock);
+          await bot.waitForTicks(2);
+        }
       }
     }
 
-    // Play in sequence
+    // Play sequence
     for (let i = 0; i < song.length; i++) {
       const notePos = startPos.offset(i, 0, 0);
       const noteBlock = bot.blockAt(notePos);
-      await bot.activateBlock(noteBlock);
+      if (noteBlock && noteBlock.name === 'note_block') {
+        await bot.activateBlock(noteBlock);
+      }
       await bot.waitForTicks(song[i].delay);
     }
 
