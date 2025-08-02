@@ -119,18 +119,11 @@ function startBot() {
     });
   }
 
-  bot.on('kicked', (reason) => {
-    console.log('👢 Bot was kicked:', reason);
-    console.log("⏳ Reconnecting in 5 minutes...");
-    setTimeout(() => {
-      console.log("🔁 Reconnecting after kick...");
-      startBot();
-    }, 5 * 60 * 1000);
-  });
+  // REMOVED bot.on('kicked') block
 
   bot.on('end', () => {
     console.log("⚠️ Bot disconnected (end). Reconnecting immediately...");
-    startBot();
+    startBot(); // ⚠️ This reconnects instantly
   });
 
   bot.on('error', (err) => {
