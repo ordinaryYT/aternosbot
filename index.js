@@ -157,25 +157,35 @@ function startBot() {
 
   // === Build Note Grid ===
   async function buildNoteGrid(song, base) {
-    const dirtId = bot.registry.blocksByName.dirt.id;
-    const noteBlockId = bot.registry.blocksByName.note_block.id;
+    const dirtId = bot.registry.itemsByName.dirt.id;
+    const noteBlockId = bot.registry.itemsByName.note_block.id;
 
     for (let i = 0; i < song.length; i++) {
       const pos = base.offset(i, 0, 0);
       const below = pos.offset(0, -1, 0);
 
-      // Place dirt under
+      // Place dirt block underneath
       await bot.creative.setInventorySlot(36, dirtId, null);
-      await bot.placeBlock(bot.blockAt(below.offset(0, -1, 0)), new Vec3(0, 1, 0));
+      await bot.waitForTicks(2);
+      const underBlock = bot.blockAt(below.offset(0, -1, 0));
+      if (underBlock) {
+        await bot.placeBlock(underBlock, new Vec3(0, 1, 0));
+        await bot.waitForTicks(2);
+      }
 
-      // Place note block
+      // Place note block on top of dirt
       await bot.creative.setInventorySlot(36, noteBlockId, null);
-      await bot.placeBlock(bot.blockAt(below), new Vec3(0, 1, 0));
+      await bot.waitForTicks(2);
+      const dirtBlock = bot.blockAt(below);
+      if (dirtBlock) {
+        await bot.placeBlock(dirtBlock, new Vec3(0, 1, 0));
+        await bot.waitForTicks(2);
+      }
 
-      // Tune note block
+      // Tune the note block
       const block = bot.blockAt(pos);
       for (let n = 0; n < song[i].note; n++) {
-        await bot.activateBlock(block);
+        if (block) await bot.activateBlock(block);
         await bot.waitForTicks(1);
       }
     }
