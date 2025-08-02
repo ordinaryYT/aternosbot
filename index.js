@@ -3,16 +3,13 @@ const Vec3 = require('vec3');
 const express = require('express');
 const mcData = require('minecraft-data');
 
-// === Express Web Server (for Render ping) ===
+// === Express Web Server ===
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.get('/', (req, res) => res.send('✅ Minecraft Bot is running.'));
+app.listen(PORT, () => console.log(`🌐 Web server listening on ${PORT}`));
 
-app.get('/', (req, res) => res.send('✅ Minecraft Bot is running on Render.'));
-app.listen(PORT, () => {
-  console.log(`🌐 Web server is listening on port ${PORT}`);
-});
-
-// === Minecraft Bot Configuration ===
+// === Bot Config ===
 let bot;
 let isDancing = false;
 
@@ -31,49 +28,33 @@ const commands = {
   rickroll: "Plays Never Gonna Give You Up with note blocks"
 };
 
-// === Start Bot ===
+// === Bot Start ===
 function startBot() {
   bot = mineflayer.createBot(config);
   const versionData = mcData(bot.version);
 
   bot.once('spawn', () => {
     console.log('✅ Bot connected.');
-    setInterval(() => {
-      if (!bot.isSleeping && !isDancing) {
-        try {
-          bot.setControlState('jump', true);
-          setTimeout(() => bot.setControlState('jump', false), 500);
-        } catch (err) {
-          console.error('❌ Jump error:', err);
-        }
-      }
-    }, 15000);
   });
 
   // === Chat Commands ===
   bot.on('chat', async (username, message) => {
     if (username === bot.username) return;
-
     const args = message.trim().split(' ');
     const cmd = args[0].toLowerCase();
 
     if (cmd === 'help' || cmd === '!help') {
       bot.chat("Available commands:");
-      for (const c in commands) {
-        bot.chat(`- ${c}: ${commands[c]}`);
-      }
+      for (const c in commands) bot.chat(`- ${c}: ${commands[c]}`);
     }
 
     if (cmd === 'coords' || cmd === '!coords') {
       const pos = bot.entity.position;
-      bot.chat(`📍 My coords: X:${pos.x.toFixed(1)} Y:${pos.y.toFixed(1)} Z:${pos.z.toFixed(1)}`);
+      bot.chat(`📍 X:${pos.x.toFixed(1)} Y:${pos.y.toFixed(1)} Z:${pos.z.toFixed(1)}`);
     }
 
     if (cmd === 'dance' || cmd === '!dance') {
-      if (bot.isSleeping) {
-        bot.chat("😴 I can't dance while sleeping!");
-        return;
-      }
+      if (bot.isSleeping) return bot.chat("😴 Can't dance while sleeping!");
       bot.chat("💃 Dancing!");
       isDancing = true;
       let jumps = 0;
@@ -91,9 +72,7 @@ function startBot() {
       }, 600);
     }
 
-    if (cmd === 'sleep' || cmd === '!sleep') {
-      trySleep();
-    }
+    if (cmd === 'sleep' || cmd === '!sleep') trySleep();
 
     if (cmd === 'rickroll' || cmd === '!rickroll') {
       bot.chat("🎵 Starting Rickroll...");
@@ -106,9 +85,23 @@ function startBot() {
     }
   });
 
+  // === Move Bot to Target X,Z Position ===
+  async function moveTo(targetPos) {
+    return new Promise((resolve) => {
+      bot.setControlState('forward', true);
+      const check = setInterval(() => {
+        const dist = bot.entity.position.distanceTo(targetPos);
+        if (dist < 2) {
+          bot.setControlState('forward', false);
+          clearInterval(check);
+          resolve();
+        }
+      }, 100);
+    });
+  }
+
   // === Rickroll Function ===
   async function playRickroll() {
-    // Simple recognizable intro phrase
     const song = [
       { pitch: 7, delay: 4 },
       { pitch: 7, delay: 4 },
@@ -124,47 +117,47 @@ function startBot() {
       { pitch: 4, delay: 8 }
     ];
 
-    const startPos = bot.entity.position.offset(1, 0, 0);
     const noteBlockItem = bot.inventory.items().find(item => item.name === 'note_block');
     if (!noteBlockItem) {
       bot.chat('❌ I need note blocks in my inventory!');
       return;
     }
 
-    // Place blocks
-    for (let i = 0; i < song.length; i++) {
-      const placePos = startPos.offset(i, 0, 0);
-      const blockBelow = bot.blockAt(placePos.offset(0, -1, 0));
+    let placeBase = bot.entity.position.floored().offset(1, 0, 0);
 
+    for (let i = 0; i < song.length; i++) {
+      // Move close enough to place
+      await moveTo(placeBase);
+
+      const blockBelow = bot.blockAt(placeBase.offset(0, -1, 0));
       if (!blockBelow || blockBelow.name === 'air') {
-        bot.chat(`❌ Cannot place note block at ${placePos} - no block below!`);
-        continue;
+        bot.chat(`❌ No block under note at index ${i}`);
+        return;
       }
 
       await bot.equip(noteBlockItem, 'hand');
       try {
         await bot.placeBlock(blockBelow, new Vec3(0, 1, 0));
       } catch (err) {
-        console.error(`❌ Failed to place block at ${placePos}:`, err);
+        console.error(`❌ Failed placing at ${placeBase}:`, err);
       }
 
-      const placedBlock = bot.blockAt(placePos);
+      const placedBlock = bot.blockAt(placeBase);
       if (placedBlock && placedBlock.name === 'note_block') {
         for (let t = 0; t < song[i].pitch; t++) {
           await bot.activateBlock(placedBlock);
           await bot.waitForTicks(2);
         }
       }
-    }
 
-    // Play sequence
-    for (let i = 0; i < song.length; i++) {
-      const notePos = startPos.offset(i, 0, 0);
-      const noteBlock = bot.blockAt(notePos);
-      if (noteBlock && noteBlock.name === 'note_block') {
-        await bot.activateBlock(noteBlock);
+      // Play it
+      if (placedBlock) {
+        await bot.activateBlock(placedBlock);
       }
       await bot.waitForTicks(song[i].delay);
+
+      // Next position
+      placeBase = placeBase.offset(1, 0, 0);
     }
 
     bot.chat("✅ Rickroll complete!");
@@ -175,42 +168,29 @@ function startBot() {
     const bed = bot.findBlock({
       matching: block => block.name.endsWith('_bed')
     });
-    if (!bed) {
-      bot.chat("🛏 No bed nearby!");
-      return;
-    }
-    bot.sleep(bed).then(() => {
-      bot.chat("💤 Sleeping...");
-    }).catch(err => {
-      console.error('❌ Failed to sleep:', err);
-      bot.chat("❌ Can't sleep: " + err.message);
-    });
+    if (!bed) return bot.chat("🛏 No bed nearby!");
+    bot.sleep(bed)
+      .then(() => bot.chat("💤 Sleeping..."))
+      .catch(err => {
+        console.error('❌ Failed to sleep:', err);
+        bot.chat("❌ Can't sleep: " + err.message);
+      });
   }
 
   bot.on('time', () => {
     const time = bot.time.timeOfDay;
     const isNight = time > 12541 && time < 23458;
-    if (isNight && !bot.isSleeping) {
-      trySleep();
-    }
+    if (isNight && !bot.isSleeping) trySleep();
   });
 
   bot.on('end', () => {
-    console.log("⚠️ Bot disconnected (end). Reconnecting immediately...");
+    console.log("⚠️ Disconnected, reconnecting...");
     startBot();
   });
 
-  bot.on('error', (err) => {
-    console.error('❌ Bot error:', err);
-  });
-
-  process.on('unhandledRejection', (reason) => {
-    console.error('🛑 Unhandled Promise Rejection:', reason);
-  });
-
-  process.on('uncaughtException', (err) => {
-    console.error('🔥 Uncaught Exception:', err);
-  });
+  bot.on('error', (err) => console.error('❌ Bot error:', err));
+  process.on('unhandledRejection', (reason) => console.error('🛑 Unhandled Promise:', reason));
+  process.on('uncaughtException', (err) => console.error('🔥 Uncaught Exception:', err));
 }
 
 startBot();
