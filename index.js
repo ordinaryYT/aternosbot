@@ -1,6 +1,7 @@
 const mineflayer = require('mineflayer');
 const Vec3 = require('vec3');
 const express = require('express');
+const mcData = require('minecraft-data');
 
 // === Express Web Server (for Render ping) ===
 const app = express();
@@ -26,15 +27,17 @@ const commands = {
   help: "Shows all commands",
   coords: "Shows my coordinates",
   dance: "Bot dances",
-  sleep: "sleeps"
+  sleep: "Sleeps in a bed",
+  rickroll: "Plays Never Gonna Give You Up with note blocks"
 };
 
+// === Start Bot ===
 function startBot() {
   bot = mineflayer.createBot(config);
+  const versionData = mcData(bot.version);
 
   bot.once('spawn', () => {
     console.log('✅ Bot connected.');
-
     setInterval(() => {
       if (!bot.isSleeping && !isDancing) {
         try {
@@ -47,7 +50,8 @@ function startBot() {
     }, 15000);
   });
 
-  bot.on('chat', (username, message) => {
+  // === Chat Commands ===
+  bot.on('chat', async (username, message) => {
     if (username === bot.username) return;
 
     const args = message.trim().split(' ');
@@ -70,7 +74,6 @@ function startBot() {
         bot.chat("😴 I can't dance while sleeping!");
         return;
       }
-
       bot.chat("💃 Dancing!");
       isDancing = true;
       let jumps = 0;
@@ -91,7 +94,82 @@ function startBot() {
     if (cmd === 'sleep') {
       trySleep();
     }
+
+    if (cmd === 'rickroll') {
+      bot.chat("🎵 Get ready to never give you up!");
+      await playRickroll();
+    }
   });
+
+  // === Rickroll Function ===
+  async function playRickroll() {
+    // Simple melody (recognizable intro phrase)
+    const song = [
+      { pitch: 7, delay: 4 },  // G
+      { pitch: 7, delay: 4 },  // G
+      { pitch: 9, delay: 4 },  // A
+      { pitch: 7, delay: 4 },  // G
+      { pitch: 4, delay: 4 },  // E
+      { pitch: 2, delay: 8 },  // D
+      { pitch: 7, delay: 4 },
+      { pitch: 7, delay: 4 },
+      { pitch: 9, delay: 4 },
+      { pitch: 7, delay: 4 },
+      { pitch: 5, delay: 4 },  // F
+      { pitch: 4, delay: 8 }   // E
+    ];
+
+    const startPos = bot.entity.position.offset(1, 0, 0);
+    const noteBlockItem = bot.inventory.items().find(item => item.name === 'note_block');
+    if (!noteBlockItem) {
+      bot.chat('❌ I need note blocks in my inventory!');
+      return;
+    }
+
+    // Place fixed set of blocks (1 per unique pitch in sequence length)
+    for (let i = 0; i < song.length; i++) {
+      const placePos = startPos.offset(i, 0, 0);
+      const blockBelow = bot.blockAt(placePos.offset(0, -1, 0));
+
+      await bot.equip(noteBlockItem, 'hand');
+      await bot.placeBlock(blockBelow, new Vec3(0, 1, 0));
+
+      const placedBlock = bot.blockAt(placePos);
+
+      // Tune block
+      for (let t = 0; t < song[i].pitch; t++) {
+        await bot.activateBlock(placedBlock);
+        await bot.waitForTicks(2);
+      }
+    }
+
+    // Play in sequence
+    for (let i = 0; i < song.length; i++) {
+      const notePos = startPos.offset(i, 0, 0);
+      const noteBlock = bot.blockAt(notePos);
+      await bot.activateBlock(noteBlock);
+      await bot.waitForTicks(song[i].delay);
+    }
+
+    bot.chat("✅ Rickroll complete!");
+  }
+
+  // === Sleep Helper ===
+  function trySleep() {
+    const bed = bot.findBlock({
+      matching: block => block.name.endsWith('_bed')
+    });
+    if (!bed) {
+      bot.chat("🛏 No bed nearby!");
+      return;
+    }
+    bot.sleep(bed).then(() => {
+      bot.chat("💤 Sleeping...");
+    }).catch(err => {
+      console.error('❌ Failed to sleep:', err);
+      bot.chat("❌ Can't sleep: " + err.message);
+    });
+  }
 
   bot.on('time', () => {
     const time = bot.time.timeOfDay;
@@ -101,29 +179,9 @@ function startBot() {
     }
   });
 
-  function trySleep() {
-    const bed = bot.findBlock({
-      matching: block => block.name.endsWith('_bed')
-    });
-
-    if (!bed) {
-      bot.chat("🛏 No bed nearby!");
-      return;
-    }
-
-    bot.sleep(bed).then(() => {
-      bot.chat("💤 Sleeping...");
-    }).catch(err => {
-      console.error('❌ Failed to sleep:', err);
-      bot.chat("❌ Can't sleep: " + err.message);
-    });
-  }
-
-  // REMOVED bot.on('kicked') block
-
   bot.on('end', () => {
     console.log("⚠️ Bot disconnected (end). Reconnecting immediately...");
-    startBot(); // ⚠️ This reconnects instantly
+    startBot();
   });
 
   bot.on('error', (err) => {
