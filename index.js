@@ -2,13 +2,13 @@ const mineflayer = require('mineflayer');
 const Vec3 = require('vec3');
 const express = require('express');
 
-// === Express Web Server ===
+// === Express Server ===
 const app = express();
 const PORT = process.env.PORT || 3000;
 app.get('/', (req, res) => res.send('✅ Minecraft Bot is running.'));
 app.listen(PORT, () => console.log(`🌐 Web server on port ${PORT}`));
 
-// === Bot Setup ===
+// === Bot Config ===
 let bot;
 let isDancing = false;
 
@@ -19,6 +19,16 @@ const config = {
   version: '1.21.1'
 };
 
+// === Embedded Song ===
+const riptideSong = [
+  { note: 5, tick: 0 },
+  { note: 7, tick: 2 },
+  { note: 9, tick: 4 },
+  { note: 7, tick: 6 },
+  { note: 5, tick: 8 }
+];
+
+// === Commands Help ===
 const commands = {
   help: "Shows all commands",
   coords: "Shows my coordinates",
@@ -27,15 +37,6 @@ const commands = {
   music: "Plays nearby note blocks",
   play: "Plays a custom song like 'play riptide'"
 };
-
-// === Embedded Riptide Song ===
-const riptideSong = [
-  { note: 5, tick: 0 },
-  { note: 7, tick: 2 },
-  { note: 9, tick: 4 },
-  { note: 7, tick: 6 },
-  { note: 5, tick: 8 }
-];
 
 // === Start Bot ===
 function startBot() {
@@ -104,21 +105,32 @@ function startBot() {
       }, 700);
     }
 
-    if (cmd === 'play' && args[1] === 'riptide') {
-      try {
-        const base = bot.entity.position.offset(2, 0, 0);
-        bot.chat("🎵 Building Riptide...");
-        await buildNoteGrid(riptideSong, base);
-        bot.chat("▶️ Playing Riptide...");
-        playSong(riptideSong, base);
-      } catch (err) {
-        console.error(err);
-        bot.chat("❌ Failed to play song: " + err.message);
+    if (cmd === 'play') {
+      const songName = args[1]?.toLowerCase();
+      if (!songName) return bot.chat("❌ Usage: play <songname>");
+
+      if (songName === 'riptide') {
+        const song = riptideSong;
+        if (!Array.isArray(song) || song.length === 0) {
+          bot.chat("❌ Riptide song is not loaded properly.");
+          return;
+        }
+
+        try {
+          const base = bot.entity.position.offset(2, 0, 0);
+          bot.chat("🎵 Building Riptide...");
+          await buildNoteGrid(song, base);
+          bot.chat("▶️ Playing Riptide...");
+          playSong(song, base);
+        } catch (err) {
+          console.error(err);
+          bot.chat("❌ Failed to play song: " + err.message);
+        }
+      } else {
+        bot.chat(`❌ Unknown song: '${songName}'`);
       }
     }
   });
-
-  // === Helper Functions ===
 
   function trySleep() {
     const bed = bot.findBlock({
