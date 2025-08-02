@@ -2,13 +2,13 @@ const mineflayer = require('mineflayer');
 const Vec3 = require('vec3');
 const express = require('express');
 
-// === Express Server ===
+// === Web server to keep bot alive ===
 const app = express();
 const PORT = process.env.PORT || 3000;
-app.get('/', (req, res) => res.send('✅ Minecraft Bot is running.'));
-app.listen(PORT, () => console.log(`🌐 Web server on port ${PORT}`));
+app.get('/', (req, res) => res.send('✅ Bot is running.'));
+app.listen(PORT, () => console.log(`🌐 Web server running on port ${PORT}`));
 
-// === Bot Config ===
+// === Bot setup ===
 let bot;
 let isDancing = false;
 
@@ -19,7 +19,7 @@ const config = {
   version: '1.21.1'
 };
 
-// === Embedded Song ===
+// === Embedded Song Data ===
 const riptideSong = [
   { note: 5, tick: 0 },
   { note: 7, tick: 2 },
@@ -28,14 +28,14 @@ const riptideSong = [
   { note: 5, tick: 8 }
 ];
 
-// === Commands Help ===
+// === Command Descriptions ===
 const commands = {
-  help: "Shows all commands",
-  coords: "Shows my coordinates",
-  dance: "Bot dances",
-  sleep: "Bot tries to sleep",
-  music: "Plays nearby note blocks",
-  play: "Plays a custom song like 'play riptide'"
+  help: "Show all commands",
+  coords: "Show my coordinates",
+  dance: "Make the bot dance",
+  sleep: "Bot goes to bed",
+  music: "Play nearby note blocks",
+  play: "Play a custom song like 'play riptide'"
 };
 
 // === Start Bot ===
@@ -43,11 +43,12 @@ function startBot() {
   bot = mineflayer.createBot(config);
 
   bot.once('spawn', () => {
-    console.log('✅ Bot connected.');
+    console.log('✅ Bot connected to server.');
   });
 
   bot.on('chat', async (username, message) => {
     if (username === bot.username) return;
+
     const args = message.trim().split(' ');
     const cmd = args[0].toLowerCase();
 
@@ -66,11 +67,11 @@ function startBot() {
       bot.chat("💃 Dancing!");
       isDancing = true;
       let jumps = 0;
-      const danceInterval = setInterval(() => {
+      const interval = setInterval(() => {
         if (jumps >= 10 || bot.isSleeping) {
-          clearInterval(danceInterval);
+          clearInterval(interval);
           bot.setControlState('jump', false);
-          bot.chat("🛑 Dance finished");
+          bot.chat("🛑 Dance finished.");
           isDancing = false;
         } else {
           bot.setControlState('jump', true);
@@ -84,11 +85,15 @@ function startBot() {
 
     if (cmd === 'music') {
       const noteBlocks = bot.findBlocks({
-        matching: b => b.name === 'note_block',
+        matching: block => block.name === 'note_block',
         maxDistance: 10,
         count: 8
       });
-      if (noteBlocks.length === 0) return bot.chat("❌ No note blocks nearby!");
+
+      if (noteBlocks.length === 0) {
+        bot.chat("❌ No note blocks nearby.");
+        return;
+      }
 
       bot.chat("🎼 Playing nearby note blocks...");
       let i = 0;
@@ -98,8 +103,7 @@ function startBot() {
           bot.chat("✅ Done!");
           return;
         }
-        const pos = noteBlocks[i];
-        const block = bot.blockAt(pos);
+        const block = bot.blockAt(noteBlocks[i]);
         if (block && bot.canSeeBlock(block)) bot.activateBlock(block);
         i++;
       }, 700);
@@ -112,7 +116,7 @@ function startBot() {
       if (songName === 'riptide') {
         const song = riptideSong;
         if (!Array.isArray(song) || song.length === 0) {
-          bot.chat("❌ Riptide song is not loaded properly.");
+          bot.chat("❌ Riptide song is not available.");
           return;
         }
 
@@ -132,18 +136,26 @@ function startBot() {
     }
   });
 
+  // === Sleep Function ===
   function trySleep() {
     const bed = bot.findBlock({
       matching: block => block.name.endsWith('_bed')
     });
-    if (!bed) return bot.chat("🛏 No bed nearby!");
-    bot.sleep(bed).then(() => bot.chat("💤 Sleeping..."))
-      .catch(err => {
-        console.error('❌ Sleep error:', err);
-        bot.chat("❌ Can't sleep: " + err.message);
-      });
+
+    if (!bed) {
+      bot.chat("🛏 No bed nearby.");
+      return;
+    }
+
+    bot.sleep(bed).then(() => {
+      bot.chat("💤 Sleeping...");
+    }).catch(err => {
+      console.error('❌ Sleep error:', err);
+      bot.chat("❌ Can't sleep: " + err.message);
+    });
   }
 
+  // === Build Note Grid ===
   async function buildNoteGrid(song, base) {
     const dirtId = bot.registry.blocksByName.dirt.id;
     const noteBlockId = bot.registry.blocksByName.note_block.id;
@@ -152,7 +164,7 @@ function startBot() {
       const pos = base.offset(i, 0, 0);
       const below = pos.offset(0, -1, 0);
 
-      // Place dirt block
+      // Place dirt under
       await bot.creative.setInventorySlot(36, dirtId, null);
       await bot.placeBlock(bot.blockAt(below.offset(0, -1, 0)), new Vec3(0, 1, 0));
 
@@ -169,6 +181,7 @@ function startBot() {
     }
   }
 
+  // === Play Song ===
   function playSong(song, base) {
     let tick = 0;
     let i = 0;
@@ -183,17 +196,20 @@ function startBot() {
       tick++;
       if (i >= song.length) {
         clearInterval(interval);
-        bot.chat("✅ Riptide complete!");
+        bot.chat("✅ Riptide finished!");
       }
-    }, 100); // 100ms per tick
+    }, 100); // 1 tick = 100ms
   }
 
+  // === Error Handling ===
   bot.on('end', () => {
     console.log("⚠️ Bot disconnected. Reconnecting...");
     startBot();
   });
 
-  bot.on('error', (err) => console.error('❌ Bot error:', err));
+  bot.on('error', (err) => {
+    console.error('❌ Bot error:', err);
+  });
 }
 
 startBot();
