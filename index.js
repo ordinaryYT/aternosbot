@@ -25,7 +25,7 @@ const commands = {
   coords: "Shows my coordinates",
   dance: "Bot dances",
   sleep: "Sleeps in a bed",
-  rickroll: "Plays Never Gonna Give You Up with note blocks"
+  rickroll: "Plays Never Gonna Give You Up using note blocks"
 };
 
 // === Start Bot ===
@@ -74,7 +74,7 @@ function startBot() {
     if (cmd === 'sleep' || cmd === '!sleep') trySleep();
 
     if (cmd === 'rickroll' || cmd === '!rickroll') {
-      bot.chat("🎵 Starting Rickroll...");
+      bot.chat("🎵 Setting up Rickroll stage...");
       try {
         await playRickroll();
       } catch (err) {
@@ -84,37 +84,14 @@ function startBot() {
     }
   });
 
-  // === Move Bot Precisely ===
-  async function moveToBlockCenter(target) {
-    return new Promise((resolve) => {
-      bot.setControlState('forward', true);
-      const check = setInterval(() => {
-        const dist = bot.entity.position.distanceTo(target);
-        if (dist < 0.3) {
-          bot.setControlState('forward', false);
-          clearInterval(check);
-          resolve();
-        }
-      }, 50);
-    });
-  }
-
-  // === Rickroll Function ===
+  // === Rickroll Function (Stationary) ===
   async function playRickroll() {
     const song = [
-      { pitch: 7, delay: 4 },
-      { pitch: 7, delay: 4 },
-      { pitch: 9, delay: 4 },
-      { pitch: 7, delay: 4 },
-      { pitch: 4, delay: 4 },
-      { pitch: 2, delay: 8 },
-      { pitch: 7, delay: 4 },
-      { pitch: 7, delay: 4 },
-      { pitch: 9, delay: 4 },
-      { pitch: 7, delay: 4 },
-      { pitch: 5, delay: 4 },
-      { pitch: 4, delay: 8 }
+      0, 0, 1, 0, 2, 3, // first phrase
+      0, 0, 1, 0, 4, 2  // second phrase
     ];
+
+    const pitches = [7, 9, 4, 2, 5]; // pitches for each block ID in song
 
     const noteBlockItem = bot.inventory.items().find(item => item.name === 'note_block');
     if (!noteBlockItem) {
@@ -122,46 +99,49 @@ function startBot() {
       return;
     }
 
-    bot.look(0, 0, true);
+    const center = bot.entity.position.floored();
+    const positions = [
+      center.offset(1, 0, 0),  // east
+      center.offset(1, 0, 1),  // southeast
+      center.offset(0, 0, 1),  // south
+      center.offset(-1, 0, 1), // southwest
+      center.offset(-1, 0, 0), // west
+      center.offset(-1, 0, -1),// northwest
+      center.offset(0, 0, -1), // north
+      center.offset(1, 0, -1)  // northeast
+    ];
 
-    let startPos = bot.entity.position.floored();
-
-    for (let i = 0; i < song.length; i++) {
-      if (i > 0) {
-        // Move forward exactly 1 block
-        const nextPos = startPos.offset(0, 0, 1);
-        await moveToBlockCenter(nextPos);
-        startPos = nextPos;
-      }
-
-      // Place note block to the right and ahead
-      const placePos = startPos.offset(1, 0, 1);
-      const blockBelow = bot.blockAt(placePos.offset(0, -1, 0));
+    // Place and tune first 5 note blocks
+    for (let i = 0; i < pitches.length; i++) {
+      const pos = positions[i];
+      const blockBelow = bot.blockAt(pos.offset(0, -1, 0));
       if (!blockBelow || blockBelow.name === 'air') {
-        bot.chat(`❌ No block under note ${i + 1}`);
+        bot.chat(`❌ No block to place note block ${i}`);
         return;
       }
-
       await bot.equip(noteBlockItem, 'hand');
       try {
         await bot.placeBlock(blockBelow, new Vec3(0, 1, 0));
       } catch (err) {
-        console.error(`❌ Failed placing at ${placePos}:`, err);
+        console.error(`❌ Failed placing note block ${i}:`, err);
       }
-
-      const placedBlock = bot.blockAt(placePos);
-      if (placedBlock && placedBlock.name === 'note_block') {
-        for (let t = 0; t < song[i].pitch; t++) {
-          await bot.activateBlock(placedBlock);
+      const placed = bot.blockAt(pos);
+      if (placed && placed.name === 'note_block') {
+        for (let t = 0; t < pitches[i]; t++) {
+          await bot.activateBlock(placed);
           await bot.waitForTicks(2);
         }
       }
-
-      // Play the note
-      if (placedBlock) await bot.activateBlock(placedBlock);
-      await bot.waitForTicks(song[i].delay);
     }
 
+    bot.chat("🎶 Playing Rickroll intro...");
+    for (let noteIndex of song) {
+      const blockToPlay = bot.blockAt(positions[noteIndex]);
+      if (blockToPlay && blockToPlay.name === 'note_block') {
+        await bot.activateBlock(blockToPlay);
+      }
+      await bot.waitForTicks(6); // short gap between notes
+    }
     bot.chat("✅ Rickroll complete!");
   }
 
