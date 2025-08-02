@@ -28,10 +28,33 @@ const commands = {
   rickroll: "Plays Never Gonna Give You Up using note blocks"
 };
 
+// === Instruments for each block position ===
+const instrumentBlocks = [
+  'grass_block',  // Harp
+  'oak_planks',   // Bass
+  'stone',        // Bass Drum
+  'sand',         // Snare
+  'gold_block',   // Bell
+  'clay',         // Flute
+  'bone_block',   // Xylophone
+  'emerald_block' // Bit
+];
+
+// Pitches for each block (0-24)
+const pitches = [7, 9, 4, 2, 5, 12, 16, 19];
+
+// Song sequence (indexes of blocks to hit)
+const song = [
+  0,0,1,0,2,3,   // Never gonna give you up
+  0,0,4,0,5,6,   // Never gonna let you down
+  0,0,1,0,2,3,   // Never gonna run around
+  0,0,7,0,5,4    // and desert you
+];
+
 // === Start Bot ===
 function startBot() {
   bot = mineflayer.createBot(config);
-  const versionData = mcData(bot.version);
+  mcData(bot.version);
 
   bot.once('spawn', () => {
     console.log('✅ Bot connected.');
@@ -85,38 +108,22 @@ function startBot() {
     }
   });
 
-  // === Block types for instruments ===
-  const instrumentBlocks = [
-    'grass_block', // Harp/Piano
-    'oak_planks',  // Bass
-    'stone',       // Bass Drum
-    'sand',        // Snare
-    'gold_block',  // Bell
-    'clay',        // Flute
-    'bone_block',  // Xylophone
-    'emerald_block'// Bit
-  ];
+  async function safePlaceBlock(targetPos, itemName) {
+    const blockItem = bot.inventory.items().find(it => it.name === itemName);
+    if (!blockItem) throw new Error(`Missing item: ${itemName}`);
 
-  // === Rickroll Notes ===
-  const pitches = [7, 9, 4, 2, 5, 12, 16, 19]; // One per block in ring
+    const targetBlock = bot.blockAt(targetPos);
+    if (!targetBlock) throw new Error(`No block at ${targetPos}`);
 
-  // Chorus melody (sequence of block indexes to hit)
-  const song = [
-    0,0,1,0,2,3,   // "Never gonna give you up"
-    0,0,4,0,5,6,   // "Never gonna let you down"
-    0,0,1,0,2,3,   // "Never gonna run around"
-    0,0,7,0,5,4    // "and desert you"
-  ];
+    await bot.equip(blockItem, 'hand');
+    await bot.placeBlock(targetBlock, new Vec3(0, 1, 0));
+    await bot.waitForTicks(5); // Give server time to update
+  }
 
-  // === Build Stage ===
   async function buildRickrollStage() {
     const noteBlockItem = bot.inventory.items().find(item => item.name === 'note_block');
-    if (!noteBlockItem) {
-      bot.chat('❌ I need note blocks in my inventory!');
-      throw new Error('No note blocks in inventory');
-    }
+    if (!noteBlockItem) throw new Error('No note blocks in inventory');
 
-    // Positions around bot (ring)
     const center = bot.entity.position.floored();
     const positions = [
       center.offset(1, 0, 0),
@@ -130,34 +137,24 @@ function startBot() {
     ];
 
     for (let i = 0; i < positions.length; i++) {
-      const pos = positions[i];
-      const blockBelowPos = pos.offset(0, -1, 0);
-
+      const supportPos = positions[i].offset(0, -1, 0);
       // Place instrument block under note block
-      const blockItem = bot.inventory.items().find(item => item.name === instrumentBlocks[i]);
-      if (!blockItem) {
-        bot.chat(`❌ Missing ${instrumentBlocks[i]} for instrument ${i}`);
-        continue;
-      }
-      await bot.equip(blockItem, 'hand');
-      await bot.placeBlock(bot.blockAt(blockBelowPos), new Vec3(0, 1, 0));
+      await safePlaceBlock(supportPos, instrumentBlocks[i]);
 
-      // Place note block
-      await bot.equip(noteBlockItem, 'hand');
-      await bot.placeBlock(bot.blockAt(pos.offset(0, -1, 0)), new Vec3(0, 1, 0));
+      // Place note block on top
+      await safePlaceBlock(positions[i].offset(0, -1, 0), 'note_block');
 
-      // Tune note block
-      const placed = bot.blockAt(pos);
-      if (placed && placed.name === 'note_block') {
+      // Tune it
+      const nb = bot.blockAt(positions[i]);
+      if (nb && nb.name === 'note_block') {
         for (let t = 0; t < pitches[i]; t++) {
-          await bot.activateBlock(placed);
+          await bot.activateBlock(nb);
           await bot.waitForTicks(2);
         }
       }
     }
   }
 
-  // === Play Song ===
   async function playRickroll() {
     const center = bot.entity.position.floored();
     const positions = [
@@ -173,16 +170,15 @@ function startBot() {
 
     bot.chat("🎶 Playing Rickroll chorus...");
     for (let noteIndex of song) {
-      const blockToPlay = bot.blockAt(positions[noteIndex]);
-      if (blockToPlay && blockToPlay.name === 'note_block') {
-        await bot.activateBlock(blockToPlay);
+      const nb = bot.blockAt(positions[noteIndex]);
+      if (nb && nb.name === 'note_block') {
+        await bot.activateBlock(nb);
       }
       await bot.waitForTicks(6);
     }
     bot.chat("✅ Rickroll complete!");
   }
 
-  // === Sleep Helper ===
   function trySleep() {
     const bed = bot.findBlock({
       matching: block => block.name.endsWith('_bed')
@@ -198,8 +194,7 @@ function startBot() {
 
   bot.on('time', () => {
     const time = bot.time.timeOfDay;
-    const isNight = time > 12541 && time < 23458;
-    if (isNight && !bot.isSleeping) trySleep();
+    if (time > 12541 && time < 23458 && !bot.isSleeping) trySleep();
   });
 
   bot.on('end', () => {
@@ -208,8 +203,6 @@ function startBot() {
   });
 
   bot.on('error', (err) => console.error('❌ Bot error:', err));
-  process.on('unhandledRejection', (reason) => console.error('🛑 Unhandled Promise:', reason));
-  process.on('uncaughtException', (err) => console.error('🔥 Uncaught Exception:', err));
 }
 
 startBot();
