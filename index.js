@@ -25,9 +25,9 @@ const config = {
 const commands = {
   help: "Shows all commands",
   coords: "Shows my coordinates",
-  dance: "Bot dances",
-  sleep: "Sleeps",
-  spawn: "Teleport you to spawn"
+  dance: "dances",
+  sleep: "Sleeps"
+  
 };
 
 function startBot() {
