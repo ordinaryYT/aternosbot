@@ -23,10 +23,7 @@ const config = {
 };
 
 const commands = {
-  help: "Shows all commands",
-  coords: "Shows my coordinates",
-  dance: "dances",
-  sleep: "Sleeps"
+
   
 };
 
