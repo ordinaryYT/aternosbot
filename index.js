@@ -60,7 +60,7 @@ function startBot() {
 
     // === Help Command (only command that sends chat messages) ===
     if (cmd === 'help') {
-      bot.chat("Available commands:");
+      bot.chat("");
       for (const c in commands) {
         bot.chat(`- ${c}: ${commands[c]}`);
       }
