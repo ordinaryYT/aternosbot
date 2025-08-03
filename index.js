@@ -61,7 +61,7 @@ function startBot() {
     const args = message.trim().split(' ');
     const cmd = args[0].toLowerCase();
 
-    // === Help Command ===
+    // === Help Command (only command that sends chat messages) ===
     if (cmd === 'help') {
       bot.chat("Available commands:");
       for (const c in commands) {
@@ -69,27 +69,21 @@ function startBot() {
       }
     }
 
-    // === Coords Command ===
+    // === Silent Coords Command ===
     if (cmd === 'coords') {
-      const pos = bot.entity.position;
-      bot.chat(`📍 My coords: X:${pos.x.toFixed(1)} Y:${pos.y.toFixed(1)} Z:${pos.z.toFixed(1)}`);
+      // Silent: no chat output
     }
 
-    // === Dance Command ===
+    // === Silent Dance Command ===
     if (cmd === 'dance') {
-      if (bot.isSleeping) {
-        bot.chat("😴 I can't dance while sleeping!");
-        return;
-      }
+      if (bot.isSleeping) return;
 
-      bot.chat("💃 Dancing!");
       isDancing = true;
       let jumps = 0;
       const danceInterval = setInterval(() => {
         if (jumps >= 10 || bot.isSleeping) {
           clearInterval(danceInterval);
           bot.setControlState('jump', false);
-          bot.chat("🛑 Dance finished");
           isDancing = false;
         } else {
           bot.setControlState('jump', true);
@@ -99,20 +93,19 @@ function startBot() {
       }, 600);
     }
 
-    // === Sleep Command ===
+    // === Silent Sleep Command ===
     if (cmd === 'sleep') {
       trySleep();
     }
 
-    // === Teleport to Spawn Command ===
+    // === Silent Teleport to Spawn Command ===
     if (message.toLowerCase() === 'diamond teleport me to spawn') {
       const spawnCoords = { x: 24278, y: 71, z: 25154 }; // Change to your spawn coords
       bot.chat(`/tp ${username} ${spawnCoords.x} ${spawnCoords.y} ${spawnCoords.z}`);
-      bot.chat(`✅ Teleported ${username} to spawn!`);
     }
   });
 
-  // Auto sleep at night
+  // Auto sleep at night (silently)
   bot.on('time', () => {
     const time = bot.time.timeOfDay;
     const isNight = time > 12541 && time < 23458;
@@ -126,17 +119,9 @@ function startBot() {
       matching: block => block.name.endsWith('_bed')
     });
 
-    if (!bed) {
-      bot.chat("🛏 No bed nearby!");
-      return;
-    }
+    if (!bed) return;
 
-    bot.sleep(bed).then(() => {
-      bot.chat("💤 Sleeping...");
-    }).catch(err => {
-      console.error('❌ Failed to sleep:', err);
-      bot.chat("❌ Can't sleep: " + err.message);
-    });
+    bot.sleep(bed).catch(() => {});
   }
 
   bot.on('end', () => {
