@@ -36,6 +36,12 @@ function startBot() {
   bot.once('spawn', () => {
     console.log('✅ Bot connected.');
 
+    // Restart every 3 hours
+    setTimeout(() => {
+      console.log("🔁 Restarting bot after 3 hours...");
+      bot.quit(); // will trigger reconnect logic in bot.on('end')
+    }, 3 * 60 * 60 * 1000);
+
     // Jump every 15 seconds when idle
     setInterval(() => {
       if (!bot.isSleeping && !isDancing) {
