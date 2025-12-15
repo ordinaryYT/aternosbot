@@ -1,13 +1,21 @@
 {
-  "name": "aternos-afk-bot",
+  "name": "minecraft-dual-bot",
   "version": "1.0.0",
-  "description": "AFK bot for Aternos",
+  "description": "Dual Minecraft bots with AI, commands, and SQL location saving",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
+  "author": "YourName",
+  "license": "MIT",
   "dependencies": {
-    "mineflayer": "^4.11.1",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "mineflayer": "^4.12.1",
+    "node-fetch": "^3.3.2",
+    "pg": "^8.11.1"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
