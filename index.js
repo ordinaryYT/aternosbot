@@ -16,9 +16,9 @@ let bot;
 let isDancing = false;
 
 const config = {
-  host: 'SlxshyNationCraft.aternos.me',
-  port: 38931,
-  username: 'NoDiamondForYou',
+  host: 'server.ogdev.qzz.io',
+  port: 41140,   
+  username: 'Omg nut in my ass daddy',
   version: '1.21.1'
 };
 
