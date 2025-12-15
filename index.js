@@ -24,7 +24,7 @@ const pool = new Pool({ connectionString: DATABASE_URL });
 
 // === Bot Configurations ===
 const BOT_CONFIGS = [
-  { username: 'OGBot', host: 'server.ogdev.qzz.io', port: 41140, prefix: '!!' },
+  { username: 'OGBot', host: 'server.ogdev.qzz.io', port: 41140, prefix: '?' },
   { username: 'TLJBot', host: 'server.ogdev.qzz.io', port: 41140, prefix: '!' },
 ];
 
