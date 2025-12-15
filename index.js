@@ -1,7 +1,8 @@
-const mineflayer = require('mineflayer');
-const express = require('express');
-const fetch = require('node-fetch');
-const { Pool } = require('pg');
+import mineflayer from 'mineflayer';
+import express from 'express';
+import fetch from 'node-fetch';
+import pkg from 'pg';
+const { Pool } = pkg;
 
 // === Express Server ===
 const app = express();
@@ -110,7 +111,7 @@ function startBot(cfg) {
           return;
 
         default:
-          // Handle SQL save/load commands
+          // SQL save/load commands
           if (lower.startsWith('savelocation')) {
             const note = cmdMessage.split(' ').slice(1).join(' ');
             if (!note) {
