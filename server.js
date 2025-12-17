@@ -36,32 +36,35 @@ const SERVER = {
   keepAlive: true
 };
 
-// ================== BOT CONFIG ==================
-const MAIN_BOTS = [
-  { username: 'OGBot', prefix: '?' },
-  { username: 'TLJBot', prefix: '!' }
-];
-const AFK_BOT_USERNAME = 'AFKBot';
+// ================== BOT REFERENCES ==================
+let ogBot = null;
+let tljBot = null;
+let afkBot = null;
+let afkInterval = null;
 
-// ================== BOT FACTORIES ==================
-function createMainBot(cfg) {
-  let bot = mineflayer.createBot({ ...SERVER, username: cfg.username });
+// ================== BOT FUNCTIONS ==================
+function createMainBot(name, prefix) {
+  const bot = mineflayer.createBot({ ...SERVER, username: name });
 
-  bot.once('spawn', () => console.log(`${cfg.username} joined`));
-  bot.on('end', () => console.log(`${cfg.username} left`));
-  bot.on('error', err => console.error(`${cfg.username} error:`, err));
+  bot.once('spawn', () => console.log(`${name} spawned`));
+  bot.on('end', () => {
+    console.log(`${name} left`);
+    if (name === 'OGBot') ogBot = null;
+    if (name === 'TLJBot') tljBot = null;
+  });
+  bot.on('error', err => console.error(`${name} error:`, err));
 
   bot.on('chat', async (username, message) => {
     if (username === bot.username) return;
-    if (!message.startsWith(cfg.prefix)) return;
+    if (!message.startsWith(prefix)) return;
 
-    const cmd = message.slice(cfg.prefix.length).trim().toLowerCase();
+    const cmd = message.slice(prefix.length).trim().toLowerCase();
 
     if (cmd === 'help') {
-      bot.chat(`${cfg.prefix}Commands: help, coords, tptome, savelocation, loadlocations`);
+      bot.chat(`${prefix}Commands: help, coords, tptome, savelocation, loadlocations`);
     } else if (cmd === 'coords') {
       const p = bot.entity?.position;
-      if (p) bot.chat(`${cfg.prefix}X:${p.x.toFixed(0)} Y:${p.y.toFixed(0)} Z:${p.z.toFixed(0)}`);
+      if (p) bot.chat(`${prefix}X:${p.x.toFixed(0)} Y:${p.y.toFixed(0)} Z:${p.z.toFixed(0)}`);
     } else if (cmd === 'tptome') {
       bot.chat(`/tp ${bot.username} ${username}`);
     } else if (cmd.startsWith('savelocation')) {
@@ -70,11 +73,11 @@ function createMainBot(cfg) {
       if (pos && note) {
         await pool.query('INSERT INTO locations(bot_name, username, x, y, z, note) VALUES($1,$2,$3,$4,$5,$6)',
           [bot.username, username, pos.x, pos.y, pos.z, note]);
-        bot.chat(`${cfg.prefix}Location saved: ${note}`);
+        bot.chat(`${prefix}Location saved: ${note}`);
       }
     } else if (cmd === 'loadlocations') {
       const res = await pool.query('SELECT username,x,y,z,note FROM locations WHERE bot_name=$1 ORDER BY created_at DESC', [bot.username]);
-      res.rows.forEach(row => bot.chat(`${cfg.prefix}${row.username} @ (${row.x},${row.y},${row.z}) - ${row.note}`));
+      res.rows.forEach(row => bot.chat(`${prefix}${row.username} @ (${row.x},${row.y},${row.z}) - ${row.note}`));
     } else {
       try {
         const aiResp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -94,54 +97,47 @@ function createMainBot(cfg) {
         });
         const data = await aiResp.json();
         let reply = data?.choices?.[0]?.message?.content?.trim();
-        if (reply) bot.chat(`${cfg.prefix}${reply}`);
+        if (reply) bot.chat(`${prefix}${reply}`);
       } catch (e) {
         console.error('AI error:', e);
       }
     }
   });
 
-  return {
-    join: () => {}, // bots are always joined here
-    leave: () => { bot.quit(); }
-  };
+  return bot;
 }
 
-function createAfkBot(username) {
-  let bot = null;
-  let interval = null;
+function createAfkBot() {
   return {
     toggle() {
-      if (!bot) {
-        bot = mineflayer.createBot({ ...SERVER, username });
-        bot.once('spawn', () => {
-          interval = setInterval(() => {
-            if (!bot?.entity) return;
-            bot.setControlState('forward', true);
-            setTimeout(() => bot.setControlState('forward', false), 500);
+      if (!afkBot) {
+        afkBot = mineflayer.createBot({ ...SERVER, username: 'AFKBot' });
+        afkBot.once('spawn', () => {
+          afkInterval = setInterval(() => {
+            if (!afkBot?.entity) return;
+            afkBot.setControlState('forward', true);
+            setTimeout(() => afkBot.setControlState('forward', false), 500);
             setTimeout(() => {
-              bot.setControlState('back', true);
-              setTimeout(() => bot.setControlState('back', false), 500);
+              afkBot.setControlState('back', true);
+              setTimeout(() => afkBot.setControlState('back', false), 500);
             }, 1000);
           }, 5000);
         });
-        bot.on('end', () => { clearInterval(interval); bot = null; });
+        afkBot.on('end', () => { clearInterval(afkInterval); afkBot = null; });
+        afkBot.on('error', e => console.error('AFK bot error:', e));
       } else {
-        clearInterval(interval);
-        bot.quit();
-        bot = null;
+        clearInterval(afkInterval);
+        afkBot.quit();
+        afkBot = null;
       }
     },
-    isActive: () => !!bot
+    isActive: () => !!afkBot
   };
 }
 
-// ================== INIT ==================
-const controllers = MAIN_BOTS.map(cfg => createMainBot(cfg));
-const afkController = createAfkBot(AFK_BOT_USERNAME);
-
 // ================== DISCORD ==================
 const discord = new Client({ intents: [GatewayIntentBits.Guilds] });
+const afkController = createAfkBot();
 
 discord.once(Events.ClientReady, async () => {
   const channel = await discord.channels.fetch(DISCORD_CHANNEL_ID);
@@ -156,12 +152,25 @@ discord.once(Events.ClientReady, async () => {
 
 discord.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isButton()) return;
-  if (interaction.customId === 'join') { controllers.forEach(c => {}); return interaction.reply({ content: 'Bots ready.', ephemeral: true }); }
-  if (interaction.customId === 'leave') { controllers.forEach(c => c.leave()); return interaction.reply({ content: 'Bots left.', ephemeral: true }); }
-  if (interaction.customId === 'afk_toggle') { afkController.toggle(); return interaction.reply({ content: afkController.isActive() ? 'AFK enabled.' : 'AFK disabled.', ephemeral: true }); }
+
+  if (interaction.customId === 'join') {
+    if (!ogBot) ogBot = createMainBot('OGBot', '?');
+    if (!tljBot) tljBot = createMainBot('TLJBot', '!');
+    return interaction.reply({ content: 'Bots joined.', ephemeral: true });
+  }
+
+  if (interaction.customId === 'leave') {
+    if (ogBot) ogBot.quit(); ogBot = null;
+    if (tljBot) tljBot.quit(); tljBot = null;
+    return interaction.reply({ content: 'Bots left.', ephemeral: true });
+  }
+
+  if (interaction.customId === 'afk_toggle') {
+    afkController.toggle();
+    return interaction.reply({ content: afkController.isActive() ? 'AFK enabled.' : 'AFK disabled.', ephemeral: true });
+  }
 });
 
 discord.login(DISCORD_TOKEN);
-
 process.on('unhandledRejection', console.error);
 process.on('uncaughtException', console.error);
