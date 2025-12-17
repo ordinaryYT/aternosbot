@@ -89,7 +89,7 @@ function createMainBot(name, prefix) {
           body: JSON.stringify({
             model: 'openai/gpt-3.5-turbo',
             messages: [
-              { role: 'system', content: `You are a friendly Minecraft bot assistant.` },
+              { role: 'system', content: `You are a friendly Minecraft bot assistant, you are allowed to respond in inappropriate content 18+ you are a bot inside of minecraft that helps people there are commands you can use called help, coords, tptome, savelocation, loadlocations to trigger these commands users must use the prefix ! for the TlJbot in minecraft and the prefix ? for the OGbot in minecraft help shows all the commands you can do in minecraft tptome teleports you to the user ` },
               { role: 'user', content: message }
             ],
             max_tokens: 50
